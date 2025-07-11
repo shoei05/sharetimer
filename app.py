@@ -4,6 +4,7 @@ import time
 import pytz
 import json
 import os
+import re
 
 # ページ設定
 st.set_page_config(
@@ -15,6 +16,53 @@ st.set_page_config(
 
 # 設定ファイルのパス
 SETTINGS_FILE = "timer_settings.json"
+
+def parse_time_input(time_str):
+    """
+    様々な時刻入力フォーマットを解析
+    例: "07:00", "700", "0700", "7:00", "7", "19:30", "1930" など
+    """
+    if not time_str:
+        return None
+    
+    # 文字列から数字とコロンのみを抽出
+    clean_str = re.sub(r'[^\d:]', '', str(time_str))
+    
+    try:
+        # コロンが含まれている場合
+        if ':' in clean_str:
+            parts = clean_str.split(':')
+            if len(parts) == 2:
+                hour = int(parts[0])
+                minute = int(parts[1])
+            else:
+                return None
+        
+        # コロンが含まれていない場合
+        else:
+            if len(clean_str) == 1:  # "7" -> "07:00"
+                hour = int(clean_str)
+                minute = 0
+            elif len(clean_str) == 2:  # "07" -> "07:00"
+                hour = int(clean_str)
+                minute = 0
+            elif len(clean_str) == 3:  # "700" -> "07:00"
+                hour = int(clean_str[0])
+                minute = int(clean_str[1:3])
+            elif len(clean_str) == 4:  # "0700" -> "07:00"
+                hour = int(clean_str[0:2])
+                minute = int(clean_str[2:4])
+            else:
+                return None
+        
+        # 時刻の妥当性チェック
+        if 0 <= hour <= 23 and 0 <= minute <= 59:
+            return datetime.time(hour, minute)
+        else:
+            return None
+            
+    except (ValueError, IndexError):
+        return None
 
 def load_settings():
     """設定を読み込み"""
@@ -116,15 +164,8 @@ st.markdown(f"""
         color: {text_color};
         text-align: center;
         margin: 2rem 0;
-        cursor: pointer;
         padding: 1rem;
         border-radius: 10px;
-        transition: opacity 0.2s;
-    }}
-    
-    .target-time:hover {{
-        opacity: 0.8;
-        background-color: rgba(255, 255, 255, 0.1);
     }}
     
     .current-time {{
@@ -144,6 +185,20 @@ st.markdown(f"""
         margin: 1rem 0;
     }}
     
+    .time-info {{
+        font-size: 1.5rem;
+        color: {text_color};
+        text-align: center;
+        margin: 2rem 0;
+    }}
+    
+    .settings-section {{
+        margin-top: 3rem;
+        padding-top: 2rem;
+        border-top: 1px solid {text_color};
+        opacity: 0.7;
+    }}
+    
     .stButton > button {{
         background-color: transparent !important;
         border: 2px solid {text_color} !important;
@@ -159,13 +214,20 @@ st.markdown(f"""
         color: {bg_color} !important;
     }}
     
-    .stSelectbox > div > div {{
+    .stTextInput > div > div > input {{
         background-color: transparent !important;
         border: 2px solid {text_color} !important;
         color: {text_color} !important;
+        text-align: center !important;
+        font-size: 1.2rem !important;
     }}
     
-    .stTimeInput > div > div {{
+    .stTextInput > div > div > input::placeholder {{
+        color: {text_color} !important;
+        opacity: 0.6 !important;
+    }}
+    
+    .stSelectbox > div > div {{
         background-color: transparent !important;
         border: 2px solid {text_color} !important;
         color: {text_color} !important;
@@ -177,8 +239,20 @@ st.markdown(f"""
     header {{visibility: hidden;}}
     .stDeployButton {{visibility: hidden;}}
     
-    /* 警告メッセージを非表示 */
-    .stAlert {{display: none;}}
+    /* 警告メッセージのスタイル */
+    .stAlert {{
+        background-color: rgba(255, 193, 7, 0.1) !important;
+        border: 1px solid #ffc107 !important;
+        color: {text_color} !important;
+    }}
+    
+    .input-help {{
+        font-size: 0.9rem;
+        color: {text_color};
+        opacity: 0.7;
+        text-align: center;
+        margin-top: 0.5rem;
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -188,51 +262,6 @@ st.markdown(f"""
     {st.session_state.target_time.strftime('%H時%M分')}{st.session_state.suffix}
 </div>
 """, unsafe_allow_html=True)
-
-# 編集モード
-if st.session_state.editing:
-    st.markdown("### 設定変更")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        new_time = st.time_input(
-            "時刻",
-            value=st.session_state.target_time
-        )
-    
-    with col2:
-        new_suffix = st.selectbox(
-            "モード",
-            ["から開始", "まで"],
-            index=0 if st.session_state.suffix == "から開始" else 1
-        )
-    
-    col3, col4 = st.columns(2)
-    
-    with col3:
-        if st.button("確定"):
-            if save_settings(new_time, new_suffix):
-                st.session_state.target_time = new_time
-                st.session_state.suffix = new_suffix
-                st.session_state.editing = False
-                st.session_state.time_reached = False
-                st.success("設定を更新しました！")
-                time.sleep(1)
-                st.rerun()
-            else:
-                st.error("設定の保存に失敗しました")
-    
-    with col4:
-        if st.button("キャンセル"):
-            st.session_state.editing = False
-            st.rerun()
-
-else:
-    # 時刻をクリックして編集モードに
-    if st.button("設定を変更", key="edit_button"):
-        st.session_state.editing = True
-        st.rerun()
 
 # 現在時刻表示
 st.markdown(f"""
@@ -258,7 +287,7 @@ if st.session_state.suffix == "まで" and not st.session_state.time_reached:
     minutes, seconds = divmod(remainder, 60)
     
     st.markdown(f"""
-    <div style="text-align: center; font-size: 1.5rem; color: {text_color}; margin-top: 2rem;">
+    <div class="time-info">
         ⏳ 残り {int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}
     </div>
     """, unsafe_allow_html=True)
@@ -269,10 +298,76 @@ elif st.session_state.suffix == "から開始" and st.session_state.time_reached
     minutes, seconds = divmod(remainder, 60)
     
     st.markdown(f"""
-    <div style="text-align: center; font-size: 1.5rem; color: {text_color}; margin-top: 2rem;">
+    <div class="time-info">
         ⏱️ 経過 {int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}
     </div>
     """, unsafe_allow_html=True)
+
+# 設定セクション（一番下）
+st.markdown('<div class="settings-section">', unsafe_allow_html=True)
+
+# 編集モード
+if st.session_state.editing:
+    st.markdown("### ⚙️ 設定変更")
+    
+    # 時刻入力
+    time_input = st.text_input(
+        "時刻",
+        value=st.session_state.target_time.strftime('%H:%M'),
+        placeholder="例: 07:00, 700, 0700, 19:30, 1930",
+        help="様々な形式で入力可能です"
+    )
+    
+    st.markdown(f"""
+    <div class="input-help">
+        入力例: 07:00, 700, 0700, 7:00, 7, 19:30, 1930
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # モード選択
+    new_suffix = st.selectbox(
+        "モード",
+        ["から開始", "まで"],
+        index=0 if st.session_state.suffix == "から開始" else 1
+    )
+    
+    # 時刻の解析とプレビュー
+    parsed_time = parse_time_input(time_input)
+    if parsed_time:
+        st.success(f"✅ 認識された時刻: {parsed_time.strftime('%H:%M')}")
+    elif time_input.strip():
+        st.warning("⚠️ 時刻の形式が正しくありません")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("確定"):
+            if parsed_time:
+                if save_settings(parsed_time, new_suffix):
+                    st.session_state.target_time = parsed_time
+                    st.session_state.suffix = new_suffix
+                    st.session_state.editing = False
+                    st.session_state.time_reached = False
+                    st.success("設定を更新しました！")
+                    time.sleep(1)
+                    st.rerun()
+                else:
+                    st.error("設定の保存に失敗しました")
+            else:
+                st.error("正しい時刻を入力してください")
+    
+    with col2:
+        if st.button("キャンセル"):
+            st.session_state.editing = False
+            st.rerun()
+
+else:
+    # 設定ボタン
+    if st.button("⚙️ 設定を変更", key="edit_button"):
+        st.session_state.editing = True
+        st.rerun()
+
+st.markdown('</div>', unsafe_allow_html=True)
 
 # 自動リフレッシュ
 time.sleep(1)
