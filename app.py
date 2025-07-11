@@ -215,22 +215,26 @@ st.markdown(f"""
     }}
     
     .stTextInput > div > div > input {{
-        background-color: transparent !important;
+        background-color: white !important;
         border: 2px solid {text_color} !important;
-        color: {text_color} !important;
+        color: #333333 !important;
         text-align: center !important;
         font-size: 1.2rem !important;
     }}
     
     .stTextInput > div > div > input::placeholder {{
-        color: {text_color} !important;
-        opacity: 0.6 !important;
+        color: #666666 !important;
+        opacity: 0.8 !important;
     }}
     
     .stSelectbox > div > div {{
-        background-color: transparent !important;
+        background-color: white !important;
         border: 2px solid {text_color} !important;
-        color: {text_color} !important;
+        color: #333333 !important;
+    }}
+    
+    .stSelectbox > div > div > div {{
+        color: #333333 !important;
     }}
     
     /* Streamlitのデフォルト要素を非表示 */
