@@ -2,7 +2,8 @@ import streamlit as st
 import datetime
 import time
 import pytz
-import sqlite3
+import json
+import os
 
 # ページ設定
 st.set_page_config(
@@ -12,93 +13,56 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# データベース設定
-DB_PATH = "shared_timer.db"
+# 設定ファイルのパス
+SETTINGS_FILE = "timer_settings.json"
 
-def init_db():
-    """データベースの初期化"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS timer_settings (
-            id INTEGER PRIMARY KEY,
-            target_time TEXT NOT NULL,
-            suffix TEXT NOT NULL,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    
-    # 初期値があるかチェック
-    cursor.execute("SELECT COUNT(*) FROM timer_settings")
-    if cursor.fetchone()[0] == 0:
-        cursor.execute("""
-            INSERT INTO timer_settings (target_time, suffix) 
-            VALUES ('23:59', 'から開始')
-        """)
-    
-    conn.commit()
-    conn.close()
+def load_settings():
+    """設定を読み込み"""
+    try:
+        if os.path.exists(SETTINGS_FILE):
+            with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                time_obj = datetime.datetime.strptime(data['time'], '%H:%M').time()
+                return time_obj, data['suffix'], data.get('timestamp', '')
+    except:
+        pass
+    return datetime.time(23, 59), "から開始", ""
 
-def get_shared_settings():
-    """共有設定を取得"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT target_time, suffix FROM timer_settings ORDER BY updated_at DESC LIMIT 1")
-    result = cursor.fetchone()
-    conn.close()
-    
-    if result:
-        time_str, suffix = result
-        time_obj = datetime.datetime.strptime(time_str, '%H:%M').time()
-        return time_obj, suffix
-    return datetime.time(23, 59), "から開始"
+def save_settings(target_time, suffix):
+    """設定を保存"""
+    try:
+        data = {
+            'time': target_time.strftime('%H:%M'),
+            'suffix': suffix,
+            'timestamp': datetime.datetime.now().isoformat()
+        }
+        with open(SETTINGS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False)
+        return True
+    except:
+        return False
 
-def update_shared_settings(target_time, suffix):
-    """共有設定を更新"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    time_str = target_time.strftime('%H:%M')
-    cursor.execute("""
-        INSERT INTO timer_settings (target_time, suffix) 
-        VALUES (?, ?)
-    """, (time_str, suffix))
-    conn.commit()
-    conn.close()
-
-def get_last_update_time():
-    """最後の更新時刻を取得"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT updated_at FROM timer_settings ORDER BY updated_at DESC LIMIT 1")
-    result = cursor.fetchone()
-    conn.close()
-    return result[0] if result else None
-
-# データベース初期化
-init_db()
-
-# 共有設定を取得
-shared_time, shared_suffix = get_shared_settings()
+# 設定を読み込み
+shared_time, shared_suffix, last_timestamp = load_settings()
 
 # セッション状態の初期化
 if 'target_time' not in st.session_state:
     st.session_state.target_time = shared_time
 if 'suffix' not in st.session_state:
     st.session_state.suffix = shared_suffix
-if 'last_update' not in st.session_state:
-    st.session_state.last_update = get_last_update_time()
+if 'last_timestamp' not in st.session_state:
+    st.session_state.last_timestamp = last_timestamp
 if 'time_reached' not in st.session_state:
     st.session_state.time_reached = False
-if 'editing_time' not in st.session_state:
-    st.session_state.editing_time = False
-if 'editing_suffix' not in st.session_state:
-    st.session_state.editing_suffix = False
+if 'editing' not in st.session_state:
+    st.session_state.editing = False
 
 # 他のユーザーの変更をチェック
-current_update_time = get_last_update_time()
-if current_update_time != st.session_state.last_update:
-    st.session_state.target_time, st.session_state.suffix = get_shared_settings()
-    st.session_state.last_update = current_update_time
+current_time, current_suffix, current_timestamp = load_settings()
+if current_timestamp != st.session_state.last_timestamp and current_timestamp != "":
+    st.session_state.target_time = current_time
+    st.session_state.suffix = current_suffix
+    st.session_state.last_timestamp = current_timestamp
     st.session_state.time_reached = False
 
 # 日本時間の設定
@@ -122,206 +86,193 @@ if time_reached and not st.session_state.time_reached:
 elif not time_reached:
     st.session_state.time_reached = False
 
-# カスタムCSS
-background_color = "#c5487b" if st.session_state.time_reached else "#f5f5f5"
-text_color = "white" if st.session_state.time_reached else "#333"
+# 背景色とテキスト色の設定
+if st.session_state.time_reached:
+    bg_color = "#c5487b"
+    text_color = "white"
+else:
+    bg_color = "#f5f5f5"
+    text_color = "#333333"
 
+# カスタムCSS
 st.markdown(f"""
 <style>
     .stApp {{
-        background-color: {background_color};
-        transition: all 0.5s ease;
+        background-color: {bg_color} !important;
     }}
     
-    .main-container {{
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        min-height: 100vh;
+    .main {{
+        padding: 0 !important;
+    }}
+    
+    .block-container {{
+        padding: 2rem 1rem !important;
+        max-width: 100% !important;
+    }}
+    
+    .target-time {{
+        font-size: 3rem;
+        font-weight: bold;
+        color: {text_color};
         text-align: center;
-        padding: 2rem;
-    }}
-    
-    .target-time-display {{
-        font-size: 3.5rem;
-        font-weight: bold;
-        color: {text_color};
-        margin-bottom: 2rem;
-        font-family: 'Arial', sans-serif;
-        cursor: pointer;
-        transition: opacity 0.2s ease;
-    }}
-    
-    .target-time-display:hover {{
-        opacity: 0.8;
-    }}
-    
-    .current-time-display {{
-        font-size: 8rem;
-        font-weight: bold;
-        color: {text_color};
         margin: 2rem 0;
-        font-family: 'Courier New', monospace;
-        line-height: 1;
-    }}
-    
-    .date-display {{
-        font-size: 2rem;
-        color: {text_color};
-        margin-bottom: 3rem;
-        font-family: 'Arial', sans-serif;
-    }}
-    
-    .clickable {{
         cursor: pointer;
-        padding: 0.5rem 1rem;
-        border-radius: 8px;
-        transition: background-color 0.2s ease;
-        display: inline-block;
-        margin: 0 0.5rem;
+        padding: 1rem;
+        border-radius: 10px;
+        transition: opacity 0.2s;
     }}
     
-    .clickable:hover {{
+    .target-time:hover {{
+        opacity: 0.8;
         background-color: rgba(255, 255, 255, 0.1);
     }}
     
-    .edit-container {{
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 1rem;
-        margin-bottom: 2rem;
+    .current-time {{
+        font-size: 6rem;
+        font-weight: bold;
+        color: {text_color};
+        text-align: center;
+        margin: 2rem 0;
+        font-family: 'Courier New', monospace;
+        line-height: 1.1;
     }}
     
-    .stSelectbox > div > div {{
-        background-color: transparent;
-        border: 2px solid {text_color};
+    .date-display {{
+        font-size: 1.8rem;
         color: {text_color};
-    }}
-    
-    .stTimeInput > div > div {{
-        background-color: transparent;
-        border: 2px solid {text_color};
-        color: {text_color};
+        text-align: center;
+        margin: 1rem 0;
     }}
     
     .stButton > button {{
-        background-color: transparent;
-        border: 2px solid {text_color};
-        color: {text_color};
-        font-size: 1.2rem;
-        padding: 0.5rem 2rem;
-        border-radius: 8px;
-        transition: all 0.2s ease;
+        background-color: transparent !important;
+        border: 2px solid {text_color} !important;
+        color: {text_color} !important;
+        font-size: 1.1rem !important;
+        padding: 0.5rem 1.5rem !important;
+        border-radius: 8px !important;
+        width: 100% !important;
     }}
     
     .stButton > button:hover {{
-        background-color: {text_color};
-        color: {background_color};
+        background-color: {text_color} !important;
+        color: {bg_color} !important;
     }}
     
-    /* Hide Streamlit default elements */
+    .stSelectbox > div > div {{
+        background-color: transparent !important;
+        border: 2px solid {text_color} !important;
+        color: {text_color} !important;
+    }}
+    
+    .stTimeInput > div > div {{
+        background-color: transparent !important;
+        border: 2px solid {text_color} !important;
+        color: {text_color} !important;
+    }}
+    
+    /* Streamlitのデフォルト要素を非表示 */
     #MainMenu {{visibility: hidden;}}
     footer {{visibility: hidden;}}
     header {{visibility: hidden;}}
+    .stDeployButton {{visibility: hidden;}}
     
-    .stApp > div:first-child {{
-        margin-top: -80px;
-    }}
+    /* 警告メッセージを非表示 */
+    .stAlert {{display: none;}}
 </style>
 """, unsafe_allow_html=True)
 
-# メインコンテナ
-st.markdown('<div class="main-container">', unsafe_allow_html=True)
+# メイン表示
+st.markdown(f"""
+<div class="target-time">
+    {st.session_state.target_time.strftime('%H時%M分')}{st.session_state.suffix}
+</div>
+""", unsafe_allow_html=True)
 
-# 目標時刻表示（クリック可能）
-if st.session_state.editing_time or st.session_state.editing_suffix:
-    # 編集モード
-    st.markdown('<div class="edit-container">', unsafe_allow_html=True)
+# 編集モード
+if st.session_state.editing:
+    st.markdown("### 設定変更")
     
-    col1, col2, col3 = st.columns([2, 1, 1])
+    col1, col2 = st.columns(2)
     
     with col1:
-        if st.session_state.editing_time:
-            new_time = st.time_input(
-                "時刻",
-                value=st.session_state.target_time,
-                key="time_edit",
-                label_visibility="collapsed"
-            )
-        else:
-            new_time = st.session_state.target_time
+        new_time = st.time_input(
+            "時刻",
+            value=st.session_state.target_time
+        )
     
     with col2:
-        if st.session_state.editing_suffix:
-            new_suffix = st.selectbox(
-                "モード",
-                ["から開始", "まで"],
-                index=0 if st.session_state.suffix == "から開始" else 1,
-                key="suffix_edit",
-                label_visibility="collapsed"
-            )
-        else:
-            new_suffix = st.session_state.suffix
+        new_suffix = st.selectbox(
+            "モード",
+            ["から開始", "まで"],
+            index=0 if st.session_state.suffix == "から開始" else 1
+        )
+    
+    col3, col4 = st.columns(2)
     
     with col3:
         if st.button("確定"):
-            # データベースに保存
-            update_shared_settings(new_time, new_suffix)
-            
-            # セッション状態を更新
-            st.session_state.target_time = new_time
-            st.session_state.suffix = new_suffix
-            st.session_state.last_update = get_last_update_time()
-            st.session_state.time_reached = False
-            st.session_state.editing_time = False
-            st.session_state.editing_suffix = False
-            
-            st.rerun()
+            if save_settings(new_time, new_suffix):
+                st.session_state.target_time = new_time
+                st.session_state.suffix = new_suffix
+                st.session_state.editing = False
+                st.session_state.time_reached = False
+                st.success("設定を更新しました！")
+                time.sleep(1)
+                st.rerun()
+            else:
+                st.error("設定の保存に失敗しました")
     
-    st.markdown('</div>', unsafe_allow_html=True)
+    with col4:
+        if st.button("キャンセル"):
+            st.session_state.editing = False
+            st.rerun()
 
 else:
-    # 表示モード（クリック可能）
-    col1, col2 = st.columns([3, 1])
-    
-    with col1:
-        if st.button(
-            f"{st.session_state.target_time.strftime('%H時%M分')}",
-            key="time_display",
-            help="クリックして時刻を変更"
-        ):
-            st.session_state.editing_time = True
-            st.rerun()
-    
-    with col2:
-        if st.button(
-            st.session_state.suffix,
-            key="suffix_display", 
-            help="クリックしてモードを変更"
-        ):
-            st.session_state.editing_suffix = True
-            st.rerun()
+    # 時刻をクリックして編集モードに
+    if st.button("設定を変更", key="edit_button"):
+        st.session_state.editing = True
+        st.rerun()
 
 # 現在時刻表示
-st.markdown(f'''
-<div class="current-time-display">
+st.markdown(f"""
+<div class="current-time">
     {now.strftime('%H:%M:%S')}
 </div>
-''', unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
 # 日付表示
 weekdays = ['月', '火', '水', '木', '金', '土', '日']
 weekday = weekdays[now.weekday()]
 
-st.markdown(f'''
+st.markdown(f"""
 <div class="date-display">
     {now.strftime('%Y年%m月%d日')}（{weekday}）
 </div>
-''', unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
-st.markdown('</div>', unsafe_allow_html=True)
+# 残り時間または経過時間の表示
+if st.session_state.suffix == "まで" and not st.session_state.time_reached:
+    time_diff = target_dt - now
+    hours, remainder = divmod(time_diff.total_seconds(), 3600)
+    minutes, seconds = divmod(remainder, 60)
+    
+    st.markdown(f"""
+    <div style="text-align: center; font-size: 1.5rem; color: {text_color}; margin-top: 2rem;">
+        ⏳ 残り {int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}
+    </div>
+    """, unsafe_allow_html=True)
+
+elif st.session_state.suffix == "から開始" and st.session_state.time_reached:
+    time_diff = now - target_dt
+    hours, remainder = divmod(time_diff.total_seconds(), 3600)
+    minutes, seconds = divmod(remainder, 60)
+    
+    st.markdown(f"""
+    <div style="text-align: center; font-size: 1.5rem; color: {text_color}; margin-top: 2rem;">
+        ⏱️ 経過 {int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}
+    </div>
+    """, unsafe_allow_html=True)
 
 # 自動リフレッシュ
 time.sleep(1)
