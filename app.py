@@ -319,6 +319,18 @@ if st.session_state.suffix == "まで" and not st.session_state.time_reached:
     </div>
     """, unsafe_allow_html=True)
 
+elif st.session_state.suffix == "から開始" and not st.session_state.time_reached:
+    # 「から開始」モードで開始前の場合も残り時間を表示
+    time_diff = target_dt - now
+    hours, remainder = divmod(time_diff.total_seconds(), 3600)
+    minutes, seconds = divmod(remainder, 60)
+    
+    st.markdown(f"""
+    <div class="time-info">
+        ⏳ 残り {int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}
+    </div>
+    """, unsafe_allow_html=True)
+
 elif st.session_state.suffix == "から開始" and st.session_state.time_reached:
     # 目標時刻を今日の日付で再計算
     target_today = datetime.datetime.combine(datetime.date.today(), st.session_state.target_time)
