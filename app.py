@@ -370,58 +370,30 @@ if st.session_state.editing:
         value=st.session_state.target_time.strftime('%H:%M'),
         placeholder="例: 07:00, 700, 0700, 19:30, 1930",
         help="様々な形式で入力可能です",
-        key=f"time_input_field_{st.session_state.editing}_{datetime.datetime.now().microsecond}"
+        key=f"time_input_field_{st.session_state.editing}"
     )
     
     # より確実なJavaScript全選択機能
     st.markdown(f"""
     <script>
-    (function() {{
-        let attempts = 0;
-        const maxAttempts = 20;
-        
-        function selectTimeInput() {{
-            const inputs = document.querySelectorAll('input[type="text"]');
-            let timeInput = null;
-            
-            // 時刻形式の入力フィールドを探す
-            inputs.forEach(function(input) {{
-                if (input.value && input.value.match(/\\d{{1,2}}:\\d{{2}}/)) {{
-                    timeInput = input;
-                }}
-            }});
-            
-            if (timeInput) {{
-                // イベントリスナーを追加
-                timeInput.addEventListener('focus', function() {{
-                    setTimeout(() => {{
-                        this.select();
-                        this.setSelectionRange(0, this.value.length);
-                    }}, 10);
+    setTimeout(function() {{
+        const inputs = document.querySelectorAll('input[type="text"]');
+        inputs.forEach(function(input) {{
+            if (input.value.includes(':')) {{
+                input.addEventListener('focus', function() {{
+                    setTimeout(() => this.select(), 50);
                 }});
-                
-                timeInput.addEventListener('click', function() {{
-                    setTimeout(() => {{
-                        this.select();
-                        this.setSelectionRange(0, this.value.length);
-                    }}, 10);
+                input.addEventListener('click', function() {{
+                    setTimeout(() => this.select(), 50);
                 }});
-                
                 // 初回フォーカス時の全選択
-                setTimeout(() => {{
-                    timeInput.focus();
-                    timeInput.select();
-                    timeInput.setSelectionRange(0, timeInput.value.length);
-                }}, 100);
-                
-            }} else if (attempts < maxAttempts) {{
-                attempts++;
-                setTimeout(selectTimeInput, 100);
+                if (document.activeElement !== input) {{
+                    input.focus();
+                    setTimeout(() => input.select(), 100);
+                }}
             }}
-        }}
-        
-        selectTimeInput();
-    }})();
+        }});
+    }}, 500);
     </script>
     """, unsafe_allow_html=True)
     
