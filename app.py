@@ -141,10 +141,15 @@ if target_dt <= now:
 # 時刻到達の判定
 time_reached = now >= target_dt
 
-# 背景色の変更（手動切り替えも含む）
-if (time_reached and not st.session_state.time_reached) or st.session_state.force_color_change:
+# 背景色の変更（自動到達時の反転を優先）
+if time_reached and not st.session_state.time_reached:
+    # 時刻に到達した瞬間の自動反転
     st.session_state.time_reached = True
+    st.session_state.force_color_change = True
+    # 設定を保存して他の端末にも同期
+    save_settings(st.session_state.target_time, st.session_state.suffix, True, True)
 elif not time_reached and not st.session_state.force_color_change:
+    # 時刻前でかつ手動切り替えしていない場合はグレー
     st.session_state.time_reached = False
 
 # 背景色とテキスト色の設定
