@@ -338,6 +338,25 @@ elif st.session_state.suffix == "から開始" and st.session_state.time_reached
     </div>
     """, unsafe_allow_html=True)
 
+elif st.session_state.suffix == "まで" and st.session_state.time_reached:
+    # 「まで」モードでピンクの場合は期限切れ表示
+    target_today = datetime.datetime.combine(datetime.date.today(), st.session_state.target_time)
+    target_today = jst.localize(target_today)
+    
+    # 目標時刻が未来の場合は昨日の目標時刻として計算
+    if target_today > now:
+        target_today = target_today - datetime.timedelta(days=1)
+    
+    time_diff = now - target_today
+    hours, remainder = divmod(time_diff.total_seconds(), 3600)
+    minutes, seconds = divmod(remainder, 60)
+    
+    st.markdown(f"""
+    <div class="time-info">
+        🚨 期限切れ {int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}
+    </div>
+    """, unsafe_allow_html=True)
+
 # 設定セクション（一番下）
 st.markdown('<div class="settings-section">', unsafe_allow_html=True)
 
