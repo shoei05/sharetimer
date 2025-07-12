@@ -104,6 +104,8 @@ if 'time_reached' not in st.session_state:
     st.session_state.time_reached = False
 if 'editing' not in st.session_state:
     st.session_state.editing = False
+if 'force_color_change' not in st.session_state:
+    st.session_state.force_color_change = False
 
 # 他のユーザーの変更をチェック
 current_time, current_suffix, current_timestamp = load_settings()
@@ -128,10 +130,10 @@ if target_dt <= now:
 # 時刻到達の判定
 time_reached = now >= target_dt
 
-# 背景色の変更
-if time_reached and not st.session_state.time_reached:
+# 背景色の変更（手動切り替えも含む）
+if (time_reached and not st.session_state.time_reached) or st.session_state.force_color_change:
     st.session_state.time_reached = True
-elif not time_reached:
+elif not time_reached and not st.session_state.force_color_change:
     st.session_state.time_reached = False
 
 # 背景色とテキスト色の設定
@@ -222,6 +224,11 @@ st.markdown(f"""
         font-size: 1.2rem !important;
     }}
     
+    .stTextInput > div > div > input:focus {{
+        outline: none !important;
+        box-shadow: 0 0 0 2px {text_color} !important;
+    }}
+    
     .stTextInput > div > div > input::placeholder {{
         color: #666666 !important;
         opacity: 0.8 !important;
@@ -235,6 +242,11 @@ st.markdown(f"""
     
     .stSelectbox > div > div > div {{
         color: #333333 !important;
+    }}
+    
+    .color-toggle-btn {{
+        margin-top: 1rem;
+        opacity: 0.8;
     }}
     
     /* Streamlitのデフォルト要素を非表示 */
@@ -314,13 +326,34 @@ st.markdown('<div class="settings-section">', unsafe_allow_html=True)
 if st.session_state.editing:
     st.markdown("### ⚙️ 設定変更")
     
-    # 時刻入力
+    # 時刻入力（全選択機能付き）
     time_input = st.text_input(
         "時刻",
         value=st.session_state.target_time.strftime('%H:%M'),
         placeholder="例: 07:00, 700, 0700, 19:30, 1930",
-        help="様々な形式で入力可能です"
+        help="様々な形式で入力可能です",
+        key="time_input_field"
     )
+    
+    # JavaScript for auto-select on focus
+    st.markdown("""
+    <script>
+    // フォーカス時に全選択
+    document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(function() {
+            const input = document.querySelector('input[aria-label="時刻"]');
+            if (input) {
+                input.addEventListener('focus', function() {
+                    this.select();
+                });
+                input.addEventListener('click', function() {
+                    this.select();
+                });
+            }
+        }, 1000);
+    });
+    </script>
+    """, unsafe_allow_html=True)
     
     st.markdown(f"""
     <div class="input-help">
@@ -370,6 +403,23 @@ else:
     if st.button("⚙️ 設定を変更", key="edit_button"):
         st.session_state.editing = True
         st.rerun()
+
+# 色切り替えボタン
+st.markdown('<div class="color-toggle-btn">', unsafe_allow_html=True)
+current_color_status = "ピンク" if st.session_state.time_reached else "グレー"
+toggle_color_status = "グレー" if st.session_state.time_reached else "ピンク"
+
+if st.button(f"🎨 色を{toggle_color_status}に切り替え", key="color_toggle"):
+    if st.session_state.time_reached:
+        # ピンクからグレーに
+        st.session_state.time_reached = False
+        st.session_state.force_color_change = False
+    else:
+        # グレーからピンクに
+        st.session_state.time_reached = True
+        st.session_state.force_color_change = True
+    st.rerun()
+st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
 
