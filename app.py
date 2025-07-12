@@ -65,23 +65,31 @@ def parse_time_input(time_str):
         return None
 
 def load_settings():
-    """設定を読み込み"""
+    """設定を読み込み（色の状態も含む）"""
     try:
         if os.path.exists(SETTINGS_FILE):
             with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 time_obj = datetime.datetime.strptime(data['time'], '%H:%M').time()
-                return time_obj, data['suffix'], data.get('timestamp', '')
+                return (
+                    time_obj, 
+                    data['suffix'], 
+                    data.get('timestamp', ''),
+                    data.get('color_state', False),
+                    data.get('force_color', False)
+                )
     except:
         pass
-    return datetime.time(23, 59), "から開始", ""
+    return datetime.time(23, 59), "から開始", "", False, False
 
-def save_settings(target_time, suffix):
-    """設定を保存"""
+def save_settings(target_time, suffix, color_state=False, force_color=False):
+    """設定を保存（色の状態も含む）"""
     try:
         data = {
             'time': target_time.strftime('%H:%M'),
             'suffix': suffix,
+            'color_state': color_state,
+            'force_color': force_color,
             'timestamp': datetime.datetime.now().isoformat()
         }
         with open(SETTINGS_FILE, 'w', encoding='utf-8') as f:
@@ -91,7 +99,7 @@ def save_settings(target_time, suffix):
         return False
 
 # 設定を読み込み
-shared_time, shared_suffix, last_timestamp = load_settings()
+shared_time, shared_suffix, last_timestamp, shared_color_state, shared_force_color = load_settings()
 
 # セッション状態の初期化
 if 'target_time' not in st.session_state:
@@ -108,12 +116,15 @@ if 'force_color_change' not in st.session_state:
     st.session_state.force_color_change = False
 
 # 他のユーザーの変更をチェック
-current_time, current_suffix, current_timestamp = load_settings()
+current_time, current_suffix, current_timestamp, current_color_state, current_force_color = load_settings()
 if current_timestamp != st.session_state.last_timestamp and current_timestamp != "":
     st.session_state.target_time = current_time
     st.session_state.suffix = current_suffix
     st.session_state.last_timestamp = current_timestamp
-    st.session_state.time_reached = False
+    
+    # 他の端末からの色設定を同期
+    st.session_state.time_reached = current_color_state
+    st.session_state.force_color_change = current_force_color
 
 # 日本時間の設定
 jst = pytz.timezone('Asia/Tokyo')
@@ -418,11 +429,11 @@ if st.session_state.editing:
                     auto_color_change = True
                     auto_force_change = True
                 else:
-                    # 未来の時刻の場合は通常色
+                    # 未来の時刻の場合は通常色（強制変更もリセット）
                     auto_color_change = False
                     auto_force_change = False
                 
-                if save_settings(parsed_time, new_suffix):
+                if save_settings(parsed_time, new_suffix, auto_color_change, auto_force_change):
                     st.session_state.target_time = parsed_time
                     st.session_state.suffix = new_suffix
                     st.session_state.editing = False
@@ -460,15 +471,17 @@ current_color_status = "ピンク" if st.session_state.time_reached else "グレ
 toggle_color_status = "グレー" if st.session_state.time_reached else "ピンク"
 
 if st.button(f"🎨 色を{toggle_color_status}に切り替え", key="color_toggle"):
-    if st.session_state.time_reached:
-        # ピンクからグレーに
-        st.session_state.time_reached = False
-        st.session_state.force_color_change = False
+    new_color_state = not st.session_state.time_reached
+    new_force_state = new_color_state  # 手動切り替えの場合は force_color_change を設定
+    
+    # 色の状態を保存して他の端末に同期
+    if save_settings(st.session_state.target_time, st.session_state.suffix, new_color_state, new_force_state):
+        st.session_state.time_reached = new_color_state
+        st.session_state.force_color_change = new_force_state
+        st.session_state.last_timestamp = get_last_update_time() if 'get_last_update_time' in locals() else datetime.datetime.now().isoformat()
+        st.rerun()
     else:
-        # グレーからピンクに
-        st.session_state.time_reached = True
-        st.session_state.force_color_change = True
-    st.rerun()
+        st.error("色の変更を保存できませんでした")
 st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
