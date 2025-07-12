@@ -138,17 +138,18 @@ target_dt = jst.localize(target_dt)
 if target_dt <= now:
     target_dt = target_dt + datetime.timedelta(days=1)
 
-# 時刻到達の判定
-time_reached = now >= target_dt
+# 時刻到達の判定と自動色変更
+current_time_reached = now >= target_dt
 
-# 背景色の変更（自動到達時の反転を優先）
-if time_reached and not st.session_state.time_reached:
+# 時刻到達時の自動反転処理
+if current_time_reached and not st.session_state.time_reached:
     # 時刻に到達した瞬間の自動反転
     st.session_state.time_reached = True
     st.session_state.force_color_change = True
     # 設定を保存して他の端末にも同期
     save_settings(st.session_state.target_time, st.session_state.suffix, True, True)
-elif not time_reached and not st.session_state.force_color_change:
+    st.balloons()  # お祝い効果
+elif not current_time_reached and not st.session_state.force_color_change:
     # 時刻前でかつ手動切り替えしていない場合はグレー
     st.session_state.time_reached = False
 
@@ -336,27 +337,8 @@ elif st.session_state.suffix == "から開始" and not st.session_state.time_rea
     </div>
     """, unsafe_allow_html=True)
 
-elif st.session_state.suffix == "から開始" and st.session_state.time_reached:
-    # 目標時刻を今日の日付で再計算
-    target_today = datetime.datetime.combine(datetime.date.today(), st.session_state.target_time)
-    target_today = jst.localize(target_today)
-    
-    # 目標時刻が未来の場合は昨日の目標時刻として計算
-    if target_today > now:
-        target_today = target_today - datetime.timedelta(days=1)
-    
-    time_diff = now - target_today
-    hours, remainder = divmod(time_diff.total_seconds(), 3600)
-    minutes, seconds = divmod(remainder, 60)
-    
-    st.markdown(f"""
-    <div class="time-info">
-        ⏱️ 経過 {int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}
-    </div>
-    """, unsafe_allow_html=True)
-
-elif st.session_state.suffix == "まで" and st.session_state.time_reached:
-    # 「まで」モードでピンクの場合も経過時間表示
+elif st.session_state.time_reached:
+    # ピンク状態では経過時間を表示（モードに関係なく）
     target_today = datetime.datetime.combine(datetime.date.today(), st.session_state.target_time)
     target_today = jst.localize(target_today)
     
