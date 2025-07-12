@@ -309,7 +309,15 @@ if st.session_state.suffix == "まで" and not st.session_state.time_reached:
     """, unsafe_allow_html=True)
 
 elif st.session_state.suffix == "から開始" and st.session_state.time_reached:
-    time_diff = now - target_dt
+    # 目標時刻を今日の日付で再計算
+    target_today = datetime.datetime.combine(datetime.date.today(), st.session_state.target_time)
+    target_today = jst.localize(target_today)
+    
+    # 目標時刻が未来の場合は昨日の目標時刻として計算
+    if target_today > now:
+        target_today = target_today - datetime.timedelta(days=1)
+    
+    time_diff = now - target_today
     hours, remainder = divmod(time_diff.total_seconds(), 3600)
     minutes, seconds = divmod(remainder, 60)
     
@@ -332,26 +340,30 @@ if st.session_state.editing:
         value=st.session_state.target_time.strftime('%H:%M'),
         placeholder="例: 07:00, 700, 0700, 19:30, 1930",
         help="様々な形式で入力可能です",
-        key="time_input_field"
+        key=f"time_input_field_{st.session_state.editing}"
     )
     
-    # JavaScript for auto-select on focus
-    st.markdown("""
+    # より確実なJavaScript全選択機能
+    st.markdown(f"""
     <script>
-    // フォーカス時に全選択
-    document.addEventListener('DOMContentLoaded', function() {
-        setTimeout(function() {
-            const input = document.querySelector('input[aria-label="時刻"]');
-            if (input) {
-                input.addEventListener('focus', function() {
-                    this.select();
-                });
-                input.addEventListener('click', function() {
-                    this.select();
-                });
-            }
-        }, 1000);
-    });
+    setTimeout(function() {{
+        const inputs = document.querySelectorAll('input[type="text"]');
+        inputs.forEach(function(input) {{
+            if (input.value.includes(':')) {{
+                input.addEventListener('focus', function() {{
+                    setTimeout(() => this.select(), 50);
+                }});
+                input.addEventListener('click', function() {{
+                    setTimeout(() => this.select(), 50);
+                }});
+                // 初回フォーカス時の全選択
+                if (document.activeElement !== input) {{
+                    input.focus();
+                    setTimeout(() => input.select(), 100);
+                }}
+            }}
+        }});
+    }}, 500);
     </script>
     """, unsafe_allow_html=True)
     
