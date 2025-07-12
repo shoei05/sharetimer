@@ -339,7 +339,7 @@ elif st.session_state.suffix == "から開始" and st.session_state.time_reached
     """, unsafe_allow_html=True)
 
 elif st.session_state.suffix == "まで" and st.session_state.time_reached:
-    # 「まで」モードでピンクの場合は期限切れ表示
+    # 「まで」モードでピンクの場合も経過時間表示
     target_today = datetime.datetime.combine(datetime.date.today(), st.session_state.target_time)
     target_today = jst.localize(target_today)
     
@@ -353,7 +353,7 @@ elif st.session_state.suffix == "まで" and st.session_state.time_reached:
     
     st.markdown(f"""
     <div class="time-info">
-        🚨 期限切れ {int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}
+        ⏱️ 経過 {int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}
     </div>
     """, unsafe_allow_html=True)
 
@@ -370,30 +370,58 @@ if st.session_state.editing:
         value=st.session_state.target_time.strftime('%H:%M'),
         placeholder="例: 07:00, 700, 0700, 19:30, 1930",
         help="様々な形式で入力可能です",
-        key=f"time_input_field_{st.session_state.editing}"
+        key=f"time_input_field_{st.session_state.editing}_{datetime.datetime.now().microsecond}"
     )
     
     # より確実なJavaScript全選択機能
     st.markdown(f"""
     <script>
-    setTimeout(function() {{
-        const inputs = document.querySelectorAll('input[type="text"]');
-        inputs.forEach(function(input) {{
-            if (input.value.includes(':')) {{
-                input.addEventListener('focus', function() {{
-                    setTimeout(() => this.select(), 50);
-                }});
-                input.addEventListener('click', function() {{
-                    setTimeout(() => this.select(), 50);
-                }});
-                // 初回フォーカス時の全選択
-                if (document.activeElement !== input) {{
-                    input.focus();
-                    setTimeout(() => input.select(), 100);
+    (function() {{
+        let attempts = 0;
+        const maxAttempts = 20;
+        
+        function selectTimeInput() {{
+            const inputs = document.querySelectorAll('input[type="text"]');
+            let timeInput = null;
+            
+            // 時刻形式の入力フィールドを探す
+            inputs.forEach(function(input) {{
+                if (input.value && input.value.match(/\\d{{1,2}}:\\d{{2}}/)) {{
+                    timeInput = input;
                 }}
+            }});
+            
+            if (timeInput) {{
+                // イベントリスナーを追加
+                timeInput.addEventListener('focus', function() {{
+                    setTimeout(() => {{
+                        this.select();
+                        this.setSelectionRange(0, this.value.length);
+                    }}, 10);
+                }});
+                
+                timeInput.addEventListener('click', function() {{
+                    setTimeout(() => {{
+                        this.select();
+                        this.setSelectionRange(0, this.value.length);
+                    }}, 10);
+                }});
+                
+                // 初回フォーカス時の全選択
+                setTimeout(() => {{
+                    timeInput.focus();
+                    timeInput.select();
+                    timeInput.setSelectionRange(0, timeInput.value.length);
+                }}, 100);
+                
+            }} else if (attempts < maxAttempts) {{
+                attempts++;
+                setTimeout(selectTimeInput, 100);
             }}
-        }});
-    }}, 500);
+        }}
+        
+        selectTimeInput();
+    }})();
     </script>
     """, unsafe_allow_html=True)
     
