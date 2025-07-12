@@ -383,7 +383,19 @@ if st.session_state.editing:
     # 時刻の解析とプレビュー
     parsed_time = parse_time_input(time_input)
     if parsed_time:
-        st.success(f"✅ 認識された時刻: {parsed_time.strftime('%H:%M')}")
+        # 入力時刻の状態を判定
+        preview_dt = datetime.datetime.combine(datetime.date.today(), parsed_time)
+        preview_dt = jst.localize(preview_dt)
+        
+        time_status = ""
+        if new_suffix == "から開始" and preview_dt <= now:
+            time_status = " (開始時刻を過ぎています - 色が反転します)"
+        elif new_suffix == "まで" and preview_dt <= now:
+            time_status = " (期限を過ぎています - 色が反転します)"
+        elif preview_dt > now:
+            time_status = " (未来の時刻です)"
+        
+        st.success(f"✅ 認識された時刻: {parsed_time.strftime('%H:%M')}{time_status}")
     elif time_input.strip():
         st.warning("⚠️ 時刻の形式が正しくありません")
     
@@ -392,12 +404,38 @@ if st.session_state.editing:
     with col1:
         if st.button("確定"):
             if parsed_time:
+                # 入力された時刻が現在時刻を過ぎているかチェック
+                input_dt = datetime.datetime.combine(datetime.date.today(), parsed_time)
+                input_dt = jst.localize(input_dt)
+                
+                # 時刻判定と色の自動切り替え
+                if new_suffix == "から開始" and input_dt <= now:
+                    # 「から開始」で過去の時刻の場合、即座に色を反転
+                    auto_color_change = True
+                    auto_force_change = True
+                elif new_suffix == "まで" and input_dt <= now:
+                    # 「まで」で過去の時刻の場合も反転（期限切れ）
+                    auto_color_change = True
+                    auto_force_change = True
+                else:
+                    # 未来の時刻の場合は通常色
+                    auto_color_change = False
+                    auto_force_change = False
+                
                 if save_settings(parsed_time, new_suffix):
                     st.session_state.target_time = parsed_time
                     st.session_state.suffix = new_suffix
                     st.session_state.editing = False
-                    st.session_state.time_reached = False
-                    st.success("設定を更新しました！")
+                    
+                    # 色の自動設定
+                    st.session_state.time_reached = auto_color_change
+                    st.session_state.force_color_change = auto_force_change
+                    
+                    if auto_color_change:
+                        st.success("設定を更新しました！（時刻を過ぎているため色を反転）")
+                    else:
+                        st.success("設定を更新しました！")
+                    
                     time.sleep(1)
                     st.rerun()
                 else:
