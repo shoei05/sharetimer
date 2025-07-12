@@ -137,17 +137,6 @@ target_dt = jst.localize(target_dt)
 # 時刻到達の判定（今日の目標時刻と比較）
 current_time_reached = now.time() >= st.session_state.target_time
 
-# デバッグ用：時刻到達の詳細情報を表示
-st.markdown(f"""
-<div style="position: fixed; top: 10px; left: 10px; background: rgba(0,0,0,0.8); color: white; padding: 10px; border-radius: 5px; font-size: 12px; z-index: 1000;">
-現在: {now.strftime('%H:%M:%S')}<br>
-目標: {st.session_state.target_time.strftime('%H:%M')}<br>
-到達: {current_time_reached}<br>
-色状態: {st.session_state.time_reached}<br>
-強制: {st.session_state.force_color_change}
-</div>
-""", unsafe_allow_html=True)
-
 # 時刻到達時の自動反転処理
 if current_time_reached and not st.session_state.time_reached:
     # 時刻に到達した瞬間の自動反転
@@ -156,7 +145,6 @@ if current_time_reached and not st.session_state.time_reached:
     # 設定を保存して他の端末にも同期
     save_settings(st.session_state.target_time, st.session_state.suffix, True, True)
     st.balloons()  # お祝い効果
-    st.success("🎉 設定時刻に到達しました！")
 elif not current_time_reached and not st.session_state.force_color_change:
     # 時刻前でかつ手動切り替えしていない場合はグレー
     st.session_state.time_reached = False
