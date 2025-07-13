@@ -178,9 +178,10 @@ st.markdown(f"""
         font-weight: bold;
         color: {text_color};
         text-align: center;
-        margin: 2rem 0;
+        margin: 1rem 0;
         padding: 1rem;
         border-radius: 10px;
+        line-height: 1;
     }}
     
     .current-time {{
@@ -188,23 +189,25 @@ st.markdown(f"""
         font-weight: bold;
         color: {text_color};
         text-align: center;
-        margin: 2rem 0;
+        margin: 1rem 0;
         font-family: 'Courier New', monospace;
-        line-height: 1.1;
+        line-height: 0.9;
     }}
     
     .date-display {{
         font-size: 1.8rem;
         color: {text_color};
         text-align: center;
-        margin: 1rem 0;
+        margin: 0.5rem 0 1rem 0;
+        line-height: 1;
     }}
     
     .time-info {{
         font-size: 1.5rem;
         color: {text_color};
         text-align: center;
-        margin: 2rem 0;
+        margin: 1rem 0;
+        line-height: 1;
     }}
     
     .settings-section {{
