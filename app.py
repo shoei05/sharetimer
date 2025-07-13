@@ -181,7 +181,7 @@ st.markdown(f"""
         margin: 1rem 0;
         padding: 1rem;
         border-radius: 10px;
-        line-height: 1;
+        line-height: 0.9;
     }}
     
     .current-time {{
